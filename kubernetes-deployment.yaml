@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medical-app-deployment
+  labels:
+    app: medical-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: medical-app
+  template:
+    metadata:
+      labels:
+        app: medical-app
+    spec:
+      containers:
+        - name: medical-app-container
+          image: 254466556766.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest  # Replace with your actual ECR image URI
+          ports:
+            - containerPort: 8501
+          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: medical-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: medical-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8501

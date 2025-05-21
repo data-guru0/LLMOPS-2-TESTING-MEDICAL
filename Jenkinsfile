@@ -5,6 +5,7 @@ pipeline{
         AWS_REGION = 'us-east-1'
         ECR_REPO = 'my-repo'
         IMAGE_TAG = 'latest'
+        CLUSTER_NAME = 'happy-country-unicorn'
 	}
 
     stages{
@@ -30,7 +31,7 @@ pipeline{
                 docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
 
                 # Run Trivy scan, allow pipeline to continue regardless of result
-                trivy image --severity HIGH,CRITICAL --format table -o trivy-report.txt ${env.ECR_REPO}:${IMAGE_TAG} || true
+                trivy image --severity HIGH,CRITICAL  --format json -o trivy-report.json ${env.ECR_REPO}:${IMAGE_TAG} || true
 
                 docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
                 docker push ${imageFullTag}
@@ -42,21 +43,19 @@ pipeline{
     }
 }
 
-    //     stage('Deploy to ECS Fargate') {
-    // steps {
-    //     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-    //         script {
-    //             sh """
-    //             aws ecs update-service \
-    //               --cluster multi-ai-agent-cluster \
-    //               --service multi-ai-agent-def-service-shqlo39p  \
-    //               --force-new-deployment \
-    //               --region ${AWS_REGION}
-    //             """
-    //             }
-    //         }
-    //     }
-    //  }
+    stage('Deploy to EKS') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+                    script {
+                        sh """
+                        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+
+                        kubectl apply -f kubernetes-deployment.yaml
+                        """
+                    }
+                }
+            }
+        }
         
     }
 }
