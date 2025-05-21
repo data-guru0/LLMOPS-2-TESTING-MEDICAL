@@ -24,16 +24,13 @@ pipeline{
         script {
             echo 'Running Trivy scan for vulnerabilities...'
 
-            // Define report file name
             def reportFile = 'trivy-report.txt'
 
-            // Run trivy, save output to file, and print it
             sh """
                 trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress . | tee ${reportFile}
             """
 
-            // Archive the report file as a build artifact for later download
-            archiveArtifacts artissfacts: reportFile, onlyIfSuccessful: true
+            archiveArtifacts artifacts: reportFile, onlyIfSuccessful: true
         }
     }
 }
