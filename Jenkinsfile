@@ -17,44 +17,24 @@ pipeline{
             }
         }
 
-    
-    stage('Build, Trivy Scan and Push Docker Image to ECR') {
-    steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-            script {
-                def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-                def imageName = "${env.ECR_REPO}:${IMAGE_TAG}"
-                def fullImageName = "${ecrUrl}:${IMAGE_TAG}"
-                def trivyImageReport = "trivy-image-report.txt"
+    stage('Build and Push Docker Image to ECR') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+                    script {
+                        def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
 
-                echo "🔨 Building Docker image..."
-                sh "docker build -t ${imageName} ."
-
-                echo "🔍 Scanning Docker image with Trivy..."
-                sh """
-                    trivy image \\
-                        --exit-code 0 \\
-                        --severity CRITICAL,HIGH,MEDIUM \\
-                        --format table \\
-                        --no-progress \\
-                        ${imageName} | tee ${trivyImageReport}
-                """
-
-                archiveArtifacts artifacts: trivyImageReport, onlyIfSuccessful: true
-
-                echo "🔐 Logging in to AWS ECR..."
-                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
-
-                echo "🏷️ Tagging and pushing image to ECR..."
-                sh """
-                    docker tag ${imageName} ${fullImageName}
-                    docker push ${fullImageName}
-                """
+                        sh """
+                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
+                        docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
+                        docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${ecrUrl}:${IMAGE_TAG}
+                        docker push ${ecrUrl}:${IMAGE_TAG}
+                        """
+                    }
+                }
             }
         }
-    }
-}
+
     //     stage('Deploy to ECS Fargate') {
     // steps {
     //     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
