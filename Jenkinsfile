@@ -17,23 +17,34 @@ pipeline{
             }
         }
 
-    stage('Build and Push Docker Image to ECR') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-                    script {
-                        def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+    stage('Build, Scan, and Push Docker Image to ECR') {
+    steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+            script {
+                def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+                def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-                        sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
-                        docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
-                        docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${ecrUrl}:${IMAGE_TAG}
-                        docker push ${ecrUrl}:${IMAGE_TAG}
-                        """
-                    }
-                }
+                sh """
+                # Login to ECR
+                aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
+
+                # Build Docker image
+                docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
+
+                # Scan image with Trivy for vulnerabilities
+                trivy image --exit-code 1 --severity HIGH,CRITICAL ${env.ECR_REPO}:${IMAGE_TAG} || exit 1
+
+                # Tag image for ECR
+                docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
+
+                # Push image to ECR
+                docker push ${imageFullTag}
+                """
             }
         }
+    }
+}
 
     //     stage('Deploy to ECS Fargate') {
     // steps {
