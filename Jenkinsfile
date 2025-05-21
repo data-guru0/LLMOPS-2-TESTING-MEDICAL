@@ -19,22 +19,30 @@ pipeline{
             }
         }
 
-    stage('Trivy Scan') {
+    stage('Comprehensive Trivy Scan') {
     steps {
         script {
-            echo 'Running Trivy scan for vulnerabilities...'
+            echo 'Running comprehensive Trivy scan (vuln + secrets + licenses)...'
 
-            def reportFile = 'trivy-report.txt'
+            def reportFile = 'trivy-full-report.txt'
 
+            // Run trivy filesystem scan with multiple scanners and severities
+            // Using --scanners vuln,secret,license for full coverage
+            // Scan entire workspace ('.'), fail on any HIGH or CRITICAL vuln
             sh """
-                trivy fs --exit-code 1 --severity HIGH,CRITICAL --no-progress . | tee ${reportFile}
+                trivy fs \\
+                    --exit-code 1 \\
+                    --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN \\
+                    --scanners vuln,secret,license \\
+                    --no-progress \\
+                    --format table \\
+                    . | tee ${reportFile}
             """
 
             archiveArtifacts artifacts: reportFile, onlyIfSuccessful: true
         }
     }
 }
-
     // stage('Build and Push Docker Image to ECR') {
     //         steps {
     //             withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
