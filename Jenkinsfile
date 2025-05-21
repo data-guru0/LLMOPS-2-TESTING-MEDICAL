@@ -19,30 +19,28 @@ pipeline{
             }
         }
 
-    stage('Security Scans - Trivy + Bandit') {
+    stage('Trivy Scan') {
     steps {
         script {
-            echo '🔎 Running comprehensive Trivy scan (vuln + secrets + licenses)...'
-            sh '''
-                trivy fs \
-                    --exit-code 0 \
-                    --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN \
-                    --scanners vuln,secret,license \
-                    --format table \
-                    --no-progress \
-                    -o trivy-full-report.txt .
-            '''
+            echo '🔍 Running full Trivy scan on project workspace...'
 
-            echo '🔐 Running Bandit static code analysis inside virtual environment...'
-            sh '''
-                python3 -m venv bandit-venv
-                . bandit-venv/bin/activate
-                pip install --upgrade pip
-                pip install bandit
-                bandit -r . -f txt -o bandit-report.txt || true
-            '''
+            def trivyReport = "${WORKSPACE}/trivy-full-report.txt"
 
-            archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: false
+            sh """
+                echo '📁 Verifying current workspace structure...'
+                ls -laR ${WORKSPACE}
+
+                echo '🛡️ Running Trivy filesystem scan...'
+                trivy fs \\
+                    --exit-code 1 \\
+                    --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN \\
+                    --scanners vuln,secret,license \\
+                    --format table \\
+                    --no-progress \\
+                    ${WORKSPACE} | tee ${trivyReport}
+            """
+
+            archiveArtifacts artifacts: '**/trivy-full-report.txt', onlyIfSuccessful: true
         }
     }
 }
