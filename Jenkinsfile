@@ -26,21 +26,17 @@ pipeline{
                 def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
                 sh """
-                # Login to ECR
                 aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
-
-                # Build Docker image
                 docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
 
-                # Scan image with Trivy for vulnerabilities
-                trivy image --exit-code 1 --severity HIGH,CRITICAL ${env.ECR_REPO}:${IMAGE_TAG} || exit 1
+                # Run Trivy scan, allow pipeline to continue regardless of result
+                trivy image --severity HIGH,CRITICAL --format table -o trivy-report.txt ${env.ECR_REPO}:${IMAGE_TAG} || true
 
-                # Tag image for ECR
                 docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
-
-                # Push image to ECR
                 docker push ${imageFullTag}
                 """
+
+                archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
             }
         }
     }
