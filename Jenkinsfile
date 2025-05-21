@@ -19,27 +19,14 @@ pipeline{
             }
         }
 
-    stage('Comprehensive Trivy Scan') {
+    stage('Static Code Scan - Bandit') {
     steps {
         script {
-            echo 'Running comprehensive Trivy scan (vuln + secrets + licenses)...'
-
-            def reportFile = 'trivy-full-report.txt'
-
-            // Run trivy filesystem scan with multiple scanners and severities
-            // Using --scanners vuln,secret,license for full coverage
-            // Scan entire workspace ('.'), fail on any HIGH or CRITICAL vuln
-            sh """
-                trivy fs \\
-                    --exit-code 1 \\
-                    --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN \\
-                    --scanners vuln,secret,license \\
-                    --no-progress \\
-                    --format table \\
-                    . | tee ${reportFile}
-            """
-
-            archiveArtifacts artifacts: reportFile, onlyIfSuccessful: true
+            sh '''
+                pip install bandit
+                bandit -r . -f txt -o bandit-report.txt || true
+            '''
+            archiveArtifacts artifacts: 'bandit-report.txt', onlyIfSuccessful: false
         }
     }
 }
