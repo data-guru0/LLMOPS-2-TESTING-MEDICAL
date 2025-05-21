@@ -1,13 +1,11 @@
 pipeline{
     agent any
 
-    // environment {
-    //     SONAR_PROJECT_KEY = 'LLMOPS'
-	// 	SONAR_SCANNER_HOME = tool 'Sonarqube'
-    //     AWS_REGION = 'us-east-1'
-    //     ECR_REPO = 'my-repo'
-    //     IMAGE_TAG = 'latest'
-	// }
+    environment {
+        AWS_REGION = 'us-east-1'
+        ECR_REPO = 'my-repo'
+        IMAGE_TAG = 'latest'
+	}
 
     stages{
         stage('Cloning Github repo to Jenkins'){
@@ -19,49 +17,44 @@ pipeline{
             }
         }
 
-    stage('Trivy Scan') {
+    
+    stage('Build, Trivy Scan and Push Docker Image to ECR') {
     steps {
-        script {
-            echo '🔍 Running full Trivy scan on project workspace...'
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+            script {
+                def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+                def imageName = "${env.ECR_REPO}:${IMAGE_TAG}"
+                def fullImageName = "${ecrUrl}:${IMAGE_TAG}"
+                def trivyImageReport = "trivy-image-report.txt"
 
-            def trivyReport = "${WORKSPACE}/trivy-full-report.txt"
+                echo "🔨 Building Docker image..."
+                sh "docker build -t ${imageName} ."
 
-            sh """
-                echo '📁 Verifying current workspace structure...'
-                ls -laR ${WORKSPACE}
+                echo "🔍 Scanning Docker image with Trivy..."
+                sh """
+                    trivy image \\
+                        --exit-code 0 \\
+                        --severity CRITICAL,HIGH,MEDIUM \\
+                        --format table \\
+                        --no-progress \\
+                        ${imageName} | tee ${trivyImageReport}
+                """
 
-                echo '🛡️ Running Trivy filesystem scan...'
-                trivy fs \\
-                    --exit-code 1 \\
-                    --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN \\
-                    --scanners vuln,secret,license \\
-                    --format table \\
-                    --no-progress \\
-                    ${WORKSPACE} | tee ${trivyReport}
-            """
+                archiveArtifacts artifacts: trivyImageReport, onlyIfSuccessful: true
 
-            archiveArtifacts artifacts: '**/trivy-full-report.txt', onlyIfSuccessful: true
+                echo "🔐 Logging in to AWS ECR..."
+                sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}"
+
+                echo "🏷️ Tagging and pushing image to ECR..."
+                sh """
+                    docker tag ${imageName} ${fullImageName}
+                    docker push ${fullImageName}
+                """
+            }
         }
     }
 }
-    // stage('Build and Push Docker Image to ECR') {
-    //         steps {
-    //             withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-    //                 script {
-    //                     def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-    //                     def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-
-    //                     sh """
-    //                     aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
-    //                     docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
-    //                     docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${ecrUrl}:${IMAGE_TAG}
-    //                     docker push ${ecrUrl}:${IMAGE_TAG}
-    //                     """
-    //                 }
-    //             }
-    //         }
-    //     }
-
     //     stage('Deploy to ECS Fargate') {
     // steps {
     //     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
