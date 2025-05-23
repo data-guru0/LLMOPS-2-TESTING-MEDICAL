@@ -48,8 +48,6 @@ pipeline{
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
             script {
                 sh '''
-apt-get update && apt-get install -y jq
-
 aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
 export KUBECONFIG=/var/jenkins_home/.kube/config
 
