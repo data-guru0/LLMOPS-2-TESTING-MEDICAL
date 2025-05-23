@@ -42,23 +42,27 @@ pipeline{
         }
     }
 }
-
-    stage('Deploy to EKS') {
+    stage('Update AWS App Runner Service') {
     steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
             script {
-                sh '''
-aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
-export KUBECONFIG=/var/jenkins_home/.kube/config
+                def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+                def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-TOKEN=$(aws eks get-token --cluster-name ${CLUSTER_NAME} --region ${AWS_REGION} --output json | jq -r '.status.token')
+                def serviceArn = sh(script: "aws apprunner list-services --query \"ServiceSummaryList[?ServiceName=='llmops'].ServiceArn\" --output text", returnStdout: true).trim()
 
-kubectl --token=$TOKEN apply -f kubernetes-deployment.yaml --validate=false
-'''
+                echo "Updating App Runner service with new image..."
+                sh """
+                aws apprunner update-service \
+                    --service-arn ${serviceArn} \
+                    --source-configuration ImageRepository={ImageIdentifier=${imageFullTag},ImageRepositoryType=ECR,ImageConfiguration={Port=8501}}
+                """
             }
         }
     }
 }
+    
         
     }
 }
