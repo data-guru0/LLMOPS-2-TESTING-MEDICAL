@@ -47,7 +47,7 @@ pipeline{
     steps {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
             script {
-                sh """
+                sh '''
                 aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
                 export KUBECONFIG=/var/jenkins_home/.kube/config
 
@@ -56,7 +56,7 @@ pipeline{
 
                 # Use token for kubectl command
                 kubectl --token=$TOKEN apply -f kubernetes-deployment.yaml --validate=false
-                """
+'''
             }
         }
     }
