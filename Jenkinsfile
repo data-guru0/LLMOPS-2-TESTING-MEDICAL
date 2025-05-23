@@ -44,18 +44,20 @@ pipeline{
 }
 
     stage('Deploy to EKS') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-                    script {
-                        sh """
-                        aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+    steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+            script {
+                sh """
+                aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_NAME}
+                export KUBECONFIG=$HOME/.kube/config
 
-                        kubectl apply -f kubernetes-deployment.yaml
-                        """
-                    }
-                }
+                # Optional fix: skip validation if kubeconfig auth issue
+                kubectl apply -f kubernetes-deployment.yaml --validate=false
+                """
             }
         }
+    }
+}
         
     }
 }
