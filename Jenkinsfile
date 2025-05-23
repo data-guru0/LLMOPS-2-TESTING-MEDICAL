@@ -5,7 +5,6 @@ pipeline{
         AWS_REGION = 'us-east-1'
         ECR_REPO = 'my-repo'
         IMAGE_TAG = 'latest'
-        CLUSTER_NAME = 'happy-country-unicorn'
 	}
 
     stages{
