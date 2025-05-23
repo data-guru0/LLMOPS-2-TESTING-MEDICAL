@@ -49,7 +49,7 @@ pipeline{
                 def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
                 def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-                def serviceArn = sh(script: "aws apprunner list-services --query \"ServiceSummaryList[?ServiceName=='llmops'].ServiceArn\" --output text", returnStdout: true).trim()
+                def serviceArn = sh(script: "aws apprunner list-services --query \"ServiceSummaryList[?ServiceName=='llmops2'].ServiceArn\" --output text", returnStdout: true).trim()
 
                 echo "Updating App Runner service with new image..."
                 sh """
