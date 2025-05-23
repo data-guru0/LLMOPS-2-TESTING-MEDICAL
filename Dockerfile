@@ -18,11 +18,11 @@ RUN apt-get update && apt-get install -y \
 COPY . .
 
 ## Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -e .
 
 ## Expose only Streamlit default port
 EXPOSE 8501
 
 ## Run the Streamlit app
-CMD ["streamlit", "run", "src/application.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "app/application.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
