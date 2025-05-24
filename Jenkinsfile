@@ -82,7 +82,7 @@ pipeline{
         // 5) Deploy that version
         sh """
         aws elasticbeanstalk update-environment \
-          --environment-name Llmops-env \
+          --environment-name Llmops-env-1 \
           --version-label ${IMAGE_TAG}
         """
       }
