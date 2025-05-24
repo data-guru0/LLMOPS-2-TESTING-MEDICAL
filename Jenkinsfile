@@ -47,7 +47,7 @@ pipeline {
             }
         }
 
-        stage('Deploy to AWS App Runner') {
+         stage('Deploy to AWS App Runner') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
                     script {
@@ -55,21 +55,13 @@ pipeline {
                         def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
                         def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-                        echo "Deploying to AWS App Runner..."
+                        echo "Triggering deployment to AWS App Runner..."
 
                         sh """
-                        aws apprunner update-service \
-                            --service-arn \$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${SERVICE_NAME}'].ServiceArn" --output text) \
-                            --source-configuration '{
-                              "ImageRepository": {
-                                "ImageIdentifier": "${imageFullTag}",
-                                "ImageRepositoryType": "ECR",
-                                "ImageConfiguration": {
-                                  "Port": "5000"
-                                }
-                              },
-                              "AutoDeploymentsEnabled": true
-                            }' --region ${AWS_REGION}
+                        SERVICE_ARN=\$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${SERVICE_NAME}'].ServiceArn" --output text --region ${AWS_REGION})
+                        echo "Found App Runner Service ARN: \$SERVICE_ARN"
+
+                        aws apprunner start-deployment --service-arn \$SERVICE_ARN --region ${AWS_REGION}
                         """
                     }
                 }
