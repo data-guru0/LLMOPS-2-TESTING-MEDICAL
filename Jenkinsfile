@@ -36,7 +36,8 @@ pipeline{
                 docker push ${imageFullTag}
                 """
 
-                archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+
             }
         }
     }
