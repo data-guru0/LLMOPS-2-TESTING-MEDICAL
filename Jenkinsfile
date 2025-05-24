@@ -44,49 +44,51 @@ pipeline{
 }
     
     stage('Deploy to Elastic Beanstalk') {
-    steps {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
-            script {
-                def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-                def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}:${IMAGE_TAG}"
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+      script {
+        def accountId = sh(
+          script: "aws sts get-caller-identity --query Account --output text",
+          returnStdout: true
+        ).trim()
+        def ecrUrl = "${accountId}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:${IMAGE_TAG}"
 
-                // Create Dockerrun.aws.json dynamically
-                writeFile file: 'Dockerrun.aws.json', text: """
-                {
-                  "AWSEBDockerrunVersion": 1,
-                  "Image": {
-                    "Name": "${ecrUrl}",
-                    "Update": "true"
-                  },
-                  "Ports": [
-                    {
-                      "ContainerPort": "8501"
-                    }
-                  ]
-                }
-                """
-
-                // Zip the file
-                sh 'zip Dockerrun.zip Dockerrun.aws.json'
-
-                // Upload and deploy
-                sh """
-                aws s3 cp Dockerrun.zip s3://elasticbeanstalk-us-east-1-254466556766/Dockerrun-${IMAGE_TAG}.zip
-
-                aws elasticbeanstalk create-application-version \
-                  --application-name llmops \
-                  --version-label ${IMAGE_TAG} \
-                  --source-bundle S3Bucket=elasticbeanstalk-us-east-1-254466556766,S3Key=Dockerrun-${IMAGE_TAG}.zip || true
-
-                aws elasticbeanstalk update-environment \
-                  --environment-name Llmops-env \
-                  --version-label ${IMAGE_TAG}
-                """
-            }
+        // 1) Write Dockerrun.aws.json
+        writeFile file: 'Dockerrun.aws.json', text: """
+        {
+          "AWSEBDockerrunVersion": 1,
+          "Image": { "Name": "${ecrUrl}", "Update": "true" },
+          "Ports": [ { "ContainerPort": "8501" } ]
         }
-    }
-}
+        """
 
+        // 2) Zip it up
+        sh 'zip Dockerrun.zip Dockerrun.aws.json'
+
+        // 3) Upload to S3
+        sh """
+        aws s3 cp Dockerrun.zip s3://elasticbeanstalk-us-east-1-254466556766/Dockerrun-${IMAGE_TAG}.zip
+        """
+
+        // 4) Register new app version (fail fast if something’s wrong)
+        sh """
+        aws elasticbeanstalk create-application-version \
+          --application-name llmops \
+          --version-label ${IMAGE_TAG} \
+          --source-bundle S3Bucket=elasticbeanstalk-us-east-1-254466556766,S3Key=Dockerrun-${IMAGE_TAG}.zip \
+          --auto-create-application
+        """
+
+        // 5) Deploy that version
+        sh """
+        aws elasticbeanstalk update-environment \
+          --environment-name Llmops-env \
+          --version-label ${IMAGE_TAG}
+        """
+      }
+    }
+  }
+}
     
         
     }
