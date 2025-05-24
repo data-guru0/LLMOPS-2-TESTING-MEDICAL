@@ -65,7 +65,7 @@ pipeline {
                                 "ImageIdentifier": "${imageFullTag}",
                                 "ImageRepositoryType": "ECR",
                                 "ImageConfiguration": {
-                                  "Port": "8501"
+                                  "Port": "5000"
                                 }
                               },
                               "AutoDeploymentsEnabled": true
