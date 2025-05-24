@@ -71,7 +71,7 @@ pipeline{
 
                 // Upload and deploy
                 sh """
-                aws s3 cp Dockerrun.zip elasticbeanstalk-us-east-1-254466556766/Dockerrun-${IMAGE_TAG}.zip
+                aws s3 cp Dockerrun.zip s3://elasticbeanstalk-us-east-1-254466556766/Dockerrun-${IMAGE_TAG}.zip
 
                 aws elasticbeanstalk create-application-version \
                   --application-name llmops \
