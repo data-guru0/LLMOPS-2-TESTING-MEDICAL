@@ -1,35 +1,58 @@
-import streamlit as st
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 from app.components.retriever import create_qa_chain
-
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
-def main():
-    st.title("🔍 AI Medical Chatbot")
-    
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
-    for message in st.session_state.messages:
-        st.chat_message(message['role']).markdown(message['content'])
+from markupsafe import Markup
 
-    prompt = st.chat_input("Ask a medical question...")
+def nl2br(value):
+    return Markup(value.replace("\n", "<br>\n"))
 
-    if prompt:
-        st.chat_message('user').markdown(prompt)
-        st.session_state.messages.append({'role': 'user', 'content': prompt})
+app.jinja_env.filters['nl2br'] = nl2br
 
-        try:
-            qa_chain = create_qa_chain()
-            response = qa_chain.invoke({'query': prompt})
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if "messages" not in session:
+        session["messages"] = []
 
-            result = response["result"] 
-            st.chat_message('assistant').markdown(result)  
-            st.session_state.messages.append({'role': 'assistant', 'content': result})
+    if request.method == "POST":
+        user_input = request.form.get("prompt")
+        if user_input:
+            # Append user message to session chat history
+            messages = session["messages"]
+            messages.append({"role": "user", "content": user_input})
+            session["messages"] = messages
 
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+            try:
+                qa_chain = create_qa_chain()
+                response = qa_chain.invoke({"query": user_input})
+                result = response.get("result", "No response")
+
+                # Append assistant message to session chat history
+                messages.append({"role": "assistant", "content": result})
+                session["messages"] = messages
+
+            except Exception as e:
+                error_msg = f"Error: {str(e)}"
+                return render_template("index.html", messages=session["messages"], error=error_msg)
+
+        return redirect(url_for("index"))
+
+    # GET request - show chat history and input form
+    return render_template("index.html", messages=session.get("messages", []))
+
+
+@app.route("/clear")
+def clear():
+    session.pop("messages", None)
+    return redirect(url_for("index"))
+
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
