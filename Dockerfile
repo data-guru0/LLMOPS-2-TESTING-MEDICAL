@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir -e .
 EXPOSE 5000
 
 ## Run the Streamlit app
-CMD ["python", "-m", "app.application"]
+CMD ["python", "app/application.py"]
+
 
 
